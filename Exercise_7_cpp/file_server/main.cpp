@@ -16,6 +16,9 @@
 #include <netinet/in.h>
 #include <iknlib.h>
 
+#define PORT 9000
+#define BUFFERSIZE 1000
+
 using namespace std;
 
 void sendFile(string fileName, long fileSize, int outToClient);
@@ -34,7 +37,64 @@ void sendFile(string fileName, long fileSize, int outToClient);
  */
 int main(int argc, char *argv[])
 {
-    // TO DO Your own code
+    //Define variables
+    int sockfd, newsockfd;
+    socklen_t clilen;
+    char buffer[BUFFERSIZE];
+    struct sockaddr_in serv_addr, cli_addr;
+
+    //Create socket
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (sockfd < 0)
+        error("ERROR when opening socket");
+
+    //bzero clears data
+    bzero((char *) &serv_addr, sizeof(serv_addr));
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(PORT);
+
+    //Bind socket
+    if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
+              error("ERROR on binding");
+
+    while(1)
+    {
+        //Waiting for client connect
+        listen(sockfd, 1);
+        clilen = sizeof(cli_addr);
+
+        //Accept
+        newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+
+        if (newsockfd < 0)
+            error("ERROR on accept");
+
+        bzero(buffer, BUFFERSIZE);
+
+        //Reading from socket
+        string fileName = readTextTCP(buffer, BUFFERSIZE, newsockfd);
+
+        //find file with matching fileName, fileSize
+        long size = check_File_Exists(buffer);
+        if(size < 0)
+            error("No file found");
+        else
+            //sendFile(string fileName, long fileSize, int outToClient);
+            sendFile(fileName, size, newsockfd);
+
+        printf("Client is requesting: %s\n", fileName);
+
+        //close
+        close(newsockfd);
+        }
+
+    //close
+    close(sockfd);
+
+    return 0;
 }
 
 /**
@@ -46,6 +106,31 @@ int main(int argc, char *argv[])
      */
 void sendFile(string fileName, long fileSize, int outToClient)
 {
-    // TO DO Your own code
+
+   //Open file
+   ifstream fs(fileName, ifstream::in);
+   if(!fs.good())
+       error("ÅÅHHH NEJ filen eksisterer ikke måske????");
+
+   //Start from spot 0 in the filestream
+   fs.seekg(0);
+
+   char* fileSizeChar = new char[256];
+   sprintf(fileSizeChar, "%ld", fileSize);
+
+   //Send filesize
+   writeTextTCP(outToClient, fileSizeChar);
+
+   char* buf = new char[BUFFERSIZE];
+
+   //Send file
+   while(fileSize != fs.tellg())
+   {
+       int blocks = (fileSize - fs.tellg()) < 1000 ? (fileSize - fs.tellg()) : 1000;
+       fs.read(buf, blocks);
+       send(outToClient, buf, blocks, NULL);
+   }
+
+   delete[] buf;
 }
 

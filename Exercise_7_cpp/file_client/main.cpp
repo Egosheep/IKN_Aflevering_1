@@ -17,13 +17,41 @@
 #include <netdb.h>
 #include <iknlib.h>
 
+#define BUFFERSIZE 1000
+#define PORT 9000
+
 using namespace std;
 
 void receiveFile(string fileName, int socketfd);
 
 int main(int argc, char *argv[])
 {
-	// TO DO Your own code
+    string ip = argv[1];
+    string filepath = argv[2];
+    //Define variables
+    int sockfd;
+    socklen_t clilen;
+    char buffer[BUFFERSIZE];
+    struct sockaddr_in serv_addr, cli_addr;
+
+    //Create socket
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (sockfd < 0)
+        error("ERROR when opening socket");
+
+    //bzero clears data
+    bzero((char *) &serv_addr, sizeof(serv_addr));
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = stoi(ip);
+    serv_addr.sin_port = htons(PORT);
+
+    //Connect socket
+    if (connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
+              error("ERROR on connect");
+
+    receiveFile(filepath, sockfd);
 }
 
 /**
@@ -38,6 +66,24 @@ int main(int argc, char *argv[])
  */
 void receiveFile(string fileName, int sockfd)
 {
-	// TO DO Your own code
+    char* fileNameChar = new char[fileName.length()+1];
+    strcpy(fileNameChar, fileName.c_str());
+
+    writeTextTCP(sockfd, fileNameChar);
+    string extractedFileName = extractFileName(fileName.c_str());
+
+    ofstream fs(extractedFileName, ios_base::out);
+
+    auto fileSize = getFileSizeTCP(sockfd);
+
+    char* buf = new char[BUFFERSIZE];
+
+    while(fileSize != fs.tellp())
+    {
+        int bytesRead = read(sockfd, buf, BUFFERSIZE);
+        fs.write(buf, bytesRead);
+    }
+
+    delete[] buf;
 }
 
